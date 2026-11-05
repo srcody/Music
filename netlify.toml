@@ -2,6 +2,12 @@
   publish = "public"
   functions = "netlify/functions"
 
+[build.environment]
+  # SUNO_API_BASE is a public URL (it also appears as the default in code/docs),
+  # so it must not be treated as a secret by Netlify's secrets scanner.
+  # SUNO_API_KEY is still scanned.
+  SECRETS_SCAN_OMIT_KEYS = "SUNO_API_BASE"
+
 [functions]
   node_bundler = "esbuild"
 
