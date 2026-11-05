@@ -5,153 +5,199 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Music Studio — AI song generator</title>
   <meta name="description" content="Describe a song and get original AI-generated music in minutes." />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>" />
+  <meta name="theme-color" content="#08090a" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%2308090a'/><g fill='%2339ff88'><rect x='18' y='40' width='10' height='20'/><rect x='34' y='25' width='10' height='50'/><rect x='50' y='15' width='10' height='70'/><rect x='66' y='30' width='10' height='40'/></g></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand"><span class="logo">♪</span> Music Studio</div>
-    <div class="credits" id="credits" title="Remaining API credits">…</div>
+  <header class="rack topbar">
+    <div class="brand">
+      <span class="rec" id="rec"><span class="led led-red"></span>REC</span>
+      <span class="wordmark">MUSIC<b>STUDIO</b></span>
+    </div>
+    <div class="meters">
+      <div class="vu" id="vu" aria-hidden="true">
+        <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+      </div>
+      <div class="lcd" title="Remaining API credits"><span class="lcd-label">CR</span><span id="credits">----</span></div>
+    </div>
   </header>
 
   <main class="layout">
-    <section class="panel create">
-      <h1>Make a song</h1>
-      <p class="sub">Describe it, pick a vibe, and get two original tracks.</p>
+    <section class="rack console">
+      <div class="rack-head">
+        <span class="screw"></span>
+        <span class="rack-title">INPUT // NEW TAKE</span>
+        <span class="screw"></span>
+      </div>
 
-      <div class="tabs" role="tablist">
-        <button class="tab active" data-mode="simple" role="tab" aria-selected="true">Simple</button>
-        <button class="tab" data-mode="custom" role="tab" aria-selected="false">Custom</button>
+      <div class="seg tabs" role="tablist">
+        <button class="tab active" data-mode="simple" role="tab" aria-selected="true">SIMPLE</button>
+        <button class="tab" data-mode="custom" role="tab" aria-selected="false">CUSTOM</button>
       </div>
 
       <form id="form" autocomplete="off">
-        <div class="mode simple-only">
-          <label for="prompt">Song description</label>
+        <div class="field simple-only">
+          <label for="prompt"><span class="tag">PROMPT</span> describe the song</label>
           <textarea id="prompt" maxlength="3000" rows="4"
-            placeholder="An upbeat summer pop song about road trips with friends"></textarea>
+            placeholder="cozy lo-fi beat for studying on a rainy night"></textarea>
           <div class="chips" id="ideas"></div>
         </div>
 
-        <div class="mode custom-only" hidden>
-          <label for="title">Title</label>
-          <input id="title" maxlength="80" placeholder="Midnight Drive" />
-
-          <label for="lyrics" class="vocal-only">Lyrics</label>
-          <textarea id="lyrics" class="vocal-only" maxlength="5000" rows="8"
-            placeholder="[Verse]&#10;City lights are calling my name&#10;&#10;[Chorus]&#10;..."></textarea>
+        <div class="custom-only" hidden>
+          <div class="field">
+            <label for="title"><span class="tag">TITLE</span></label>
+            <input id="title" maxlength="80" placeholder="Midnight Drive" />
+          </div>
+          <div class="field vocal-only">
+            <label for="lyrics"><span class="tag">LYRICS</span> use [Verse] [Chorus] tags</label>
+            <textarea id="lyrics" maxlength="5000" rows="8"
+              placeholder="[Verse]&#10;City lights are calling my name&#10;&#10;[Chorus]&#10;..."></textarea>
+          </div>
         </div>
 
-        <label for="style">Style <span class="hint">genres, moods, instruments</span></label>
-        <input id="style" maxlength="1000" placeholder="synthwave, dreamy, female vocals, 110 bpm" />
-        <div class="chips" id="styles"></div>
+        <div class="field">
+          <label for="style"><span class="tag">STYLE</span> genres · moods · instruments</label>
+          <input id="style" maxlength="1000" placeholder="synthwave, dreamy, female vocals, 110 bpm" />
+          <div class="chips" id="styles"></div>
+        </div>
 
-        <details class="mode custom-only advanced" hidden>
-          <summary>Advanced</summary>
-          <label for="negativeTags">Avoid</label>
-          <input id="negativeTags" maxlength="1000" placeholder="heavy metal, screaming" />
+        <details class="custom-only advanced" hidden>
+          <summary><span class="tag">FX</span> advanced parameters</summary>
 
-          <div class="row">
-            <div class="vocal-only">
-              <label for="vocalGender">Voice</label>
+          <div class="field">
+            <label for="negativeTags"><span class="tag">AVOID</span></label>
+            <input id="negativeTags" maxlength="1000" placeholder="heavy metal, screaming" />
+          </div>
+
+          <div class="grid2">
+            <div class="field vocal-only">
+              <label for="vocalGender"><span class="tag">VOICE</span></label>
               <select id="vocalGender">
-                <option value="">Any</option>
-                <option value="f">Female</option>
-                <option value="m">Male</option>
+                <option value="">ANY</option>
+                <option value="f">FEMALE</option>
+                <option value="m">MALE</option>
               </select>
             </div>
-            <div>
-              <label for="variety">Variety</label>
+            <div class="field">
+              <label for="variety"><span class="tag">VARIETY</span></label>
               <select id="variety">
-                <option value="0">Off</option>
-                <option value="1" selected>Normal</option>
-                <option value="2">High</option>
-                <option value="3">Extra</option>
-                <option value="4">Max</option>
+                <option value="0">0 · OFF</option>
+                <option value="1" selected>1 · NORMAL</option>
+                <option value="2">2 · HIGH</option>
+                <option value="3">3 · EXTRA</option>
+                <option value="4">4 · MAX</option>
               </select>
             </div>
           </div>
 
-          <label for="duration">Length <span class="hint" id="durationOut">auto</span></label>
-          <input type="range" id="duration" min="0" max="360" step="10" value="0" />
-
-          <label for="styleWeight">Style adherence <span class="hint" id="styleWeightOut">default</span></label>
-          <input type="range" id="styleWeight" min="-0.01" max="1" step="0.01" value="-0.01" />
-
-          <label for="weirdness">Weirdness <span class="hint" id="weirdnessOut">default</span></label>
-          <input type="range" id="weirdness" min="-0.01" max="1" step="0.01" value="-0.01" />
+          <div class="faders">
+            <div class="fader">
+              <label for="duration">LEN</label>
+              <input type="range" id="duration" min="0" max="360" step="10" value="0" />
+              <output id="durationOut">AUTO</output>
+            </div>
+            <div class="fader">
+              <label for="styleWeight">STYLE</label>
+              <input type="range" id="styleWeight" min="-0.01" max="1" step="0.01" value="-0.01" />
+              <output id="styleWeightOut">DEF</output>
+            </div>
+            <div class="fader">
+              <label for="weirdness">WEIRD</label>
+              <input type="range" id="weirdness" min="-0.01" max="1" step="0.01" value="-0.01" />
+              <output id="weirdnessOut">DEF</output>
+            </div>
+          </div>
         </details>
 
-        <div class="row controls">
-          <label class="switch">
+        <div class="deck">
+          <fieldset class="seg models">
+            <legend class="sr-only">Model</legend>
+            <label><input type="radio" name="model" value="V6" checked /><span><i class="led"></i>V6</span></label>
+            <label><input type="radio" name="model" value="V6_WILD" /><span><i class="led"></i>WILD</span></label>
+            <label><input type="radio" name="model" value="V6_MINI" /><span><i class="led"></i>MINI</span></label>
+          </fieldset>
+          <label class="hwbtn" title="Instrumental (no vocals)">
             <input type="checkbox" id="instrumental" />
-            <span class="slider"></span>
-            Instrumental
+            <span><i class="led led-amber"></i>INST</span>
           </label>
-          <select id="model" aria-label="Model">
-            <option value="V6" selected>V6 · best quality</option>
-            <option value="V6_WILD">V6 Wild · experimental</option>
-            <option value="V6_MINI">V6 Mini · fastest</option>
-          </select>
         </div>
+        <p class="model-hint" id="modelHint"></p>
 
-        <button type="submit" class="primary" id="submit">
-          <span class="btn-label">Generate</span>
+        <button type="submit" class="gen" id="submit">
+          <span class="gen-icon">▶</span><span class="btn-label">GENERATE</span>
         </button>
         <p class="error" id="error" role="alert" hidden></p>
       </form>
     </section>
 
-    <section class="panel library">
-      <div class="library-head">
-        <h2>Your tracks</h2>
-        <button class="ghost small" id="clear" hidden>Clear history</button>
+    <section class="rack library">
+      <div class="rack-head">
+        <span class="screw"></span>
+        <span class="rack-title">TRACKS // <span id="takeCount">0</span> TAKES</span>
+        <button class="mini-btn" id="clear" hidden>CLEAR ALL</button>
+        <span class="screw"></span>
       </div>
       <div id="tracks" class="tracks">
         <div class="empty" id="empty">
-          <div class="empty-icon">🎧</div>
-          <p>Your songs will show up here.<br />Generation usually takes 1–3 minutes.</p>
+          <div class="flatline"><span></span></div>
+          <p>NO SIGNAL</p>
+          <small>Your takes show up here. A render usually takes 1–3 minutes.</small>
         </div>
       </div>
     </section>
   </main>
 
-  <div class="player" id="player" hidden>
+  <div class="transport" id="player" hidden>
+    <button class="t-play" id="tPlay" aria-label="Play/Pause">▶</button>
     <img id="playerArt" alt="" />
-    <div class="player-meta">
-      <div id="playerTitle" class="player-title"></div>
-      <div id="playerTags" class="player-tags"></div>
+    <div class="t-meta">
+      <div id="playerTitle" class="t-title"></div>
+      <div id="playerTags" class="t-tags"></div>
     </div>
-    <audio id="audio" controls preload="none"></audio>
+    <div class="lcd t-time"><span id="tCur">0:00</span><span class="dim">/</span><span id="tDur">0:00</span></div>
+    <div class="t-scrub" id="tScrub"><div class="wave wave-lg" id="tWave"></div></div>
+    <input type="range" class="t-vol" id="tVol" min="0" max="1" step="0.01" value="1" aria-label="Volume" />
+    <audio id="audio" preload="none"></audio>
   </div>
 
   <template id="jobTpl">
-    <article class="job">
-      <div class="job-head">
-        <div>
-          <div class="job-title"></div>
-          <div class="job-status"><span class="dot"></span><span class="status-text"></span></div>
-        </div>
-        <button class="ghost small remove" title="Remove">✕</button>
+    <article class="take">
+      <div class="take-head">
+        <span class="take-no"></span>
+        <span class="led take-led"></span>
+        <span class="take-title"></span>
+        <span class="take-status"></span>
+        <button class="mini-btn remove" title="Remove take">✕</button>
       </div>
-      <div class="job-tracks"></div>
+      <div class="take-tracks"></div>
     </article>
   </template>
 
   <template id="trackTpl">
-    <div class="track">
-      <button class="art" aria-label="Play">
+    <div class="strip">
+      <button class="strip-art" aria-label="Play">
         <img alt="" loading="lazy" />
-        <span class="play-icon">▶</span>
+        <span class="strip-icon">▶</span>
       </button>
-      <div class="track-info">
-        <div class="track-title"></div>
-        <div class="track-tags"></div>
-        <div class="track-actions">
-          <span class="track-duration"></span>
-          <a class="download" download target="_blank" rel="noopener">Download</a>
-          <button class="ghost small lyrics-btn">Lyrics</button>
+      <div class="strip-main">
+        <div class="strip-top">
+          <span class="strip-ch"></span>
+          <span class="strip-title"></span>
+          <span class="strip-dur"></span>
         </div>
-        <pre class="track-lyrics" hidden></pre>
+        <div class="wave"></div>
+        <div class="strip-bottom">
+          <span class="strip-tags"></span>
+          <span class="strip-actions">
+            <button class="mini-btn lyrics-btn">LYRICS</button>
+            <a class="mini-btn download" download target="_blank" rel="noopener">↓ MP3</a>
+          </span>
+        </div>
+        <pre class="strip-lyrics" hidden></pre>
       </div>
     </div>
   </template>

@@ -2,32 +2,40 @@ const $ = (id) => document.getElementById(id);
 const STORE_KEY = "music-studio:jobs";
 const POLL_MS = 5000;
 const MAX_POLL_MS = 15 * 60 * 1000;
+const BARS = 72;
 
 const STATUS_TEXT = {
-  SUBMITTING: "Sending request…",
-  PENDING: "Queued — warming up the band…",
-  TEXT_SUCCESS: "Lyrics written, composing music…",
-  FIRST_SUCCESS: "First track ready, finishing the second…",
-  SUCCESS: "Ready",
-  CREATE_TASK_FAILED: "Failed to start",
-  GENERATE_AUDIO_FAILED: "Audio generation failed",
-  CALLBACK_EXCEPTION: "Generation error",
-  SENSITIVE_WORD_ERROR: "Blocked: prompt contains restricted words",
-  TIMEOUT: "Timed out — try refreshing later",
+  PENDING: "QUEUED",
+  TEXT_SUCCESS: "WRITING ▸ COMPOSING",
+  FIRST_SUCCESS: "CH1 READY ▸ RENDERING CH2",
+  SUCCESS: "MASTERED",
+  CREATE_TASK_FAILED: "FAILED TO START",
+  GENERATE_AUDIO_FAILED: "RENDER FAILED",
+  CALLBACK_EXCEPTION: "GENERATION ERROR",
+  SENSITIVE_WORD_ERROR: "BLOCKED: RESTRICTED WORDS",
+  TIMEOUT: "TIMED OUT",
+};
+
+const MODEL_HINT = {
+  V6: "V6 — best quality, natural vocals",
+  V6_WILD: "WILD — bolder, more experimental",
+  V6_MINI: "MINI — fastest renders",
 };
 
 const IDEAS = [
-  "A cozy lo-fi beat for studying on a rainy night",
-  "An epic orchestral anthem for a hero's return",
-  "A funky disco track about dancing until sunrise",
-  "A heartfelt acoustic ballad about moving to a new city",
-  "A hard-hitting trap song about chasing dreams",
+  "cozy lo-fi beat for studying on a rainy night",
+  "epic orchestral anthem for a hero's return",
+  "funky disco track about dancing until sunrise",
+  "heartfelt acoustic ballad about moving to a new city",
+  "hard-hitting trap song about chasing dreams",
 ];
 const STYLES = ["pop", "lo-fi", "hip hop", "rock", "edm", "jazz", "r&b", "country", "cinematic", "synthwave", "acoustic", "afrobeats"];
 
 let mode = "simple";
 let jobs = load();
+let current = null; // track currently loaded in the transport
 const timers = new Map();
+const audio = $("audio");
 
 /* ---------- storage ---------- */
 function load() {
@@ -55,10 +63,44 @@ async function api(path, options) {
 async function refreshCredits() {
   try {
     const { credits } = await api("credits");
-    $("credits").textContent = `${Number(credits).toLocaleString()} credits`;
+    $("credits").textContent = String(credits).padStart(4, "0");
   } catch {
-    $("credits").textContent = "credits unavailable";
+    $("credits").textContent = "----";
   }
+}
+
+/* ---------- waveform ---------- */
+function seeded(str) {
+  let h = 2166136261;
+  for (const c of String(str)) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  return () => {
+    h = Math.imul(h ^ (h >>> 15), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return ((h ^= h >>> 16) >>> 0) / 4294967296;
+  };
+}
+
+function buildWave(el, id) {
+  const rnd = seeded(id || Math.random());
+  const heights = [];
+  let v = 0.5;
+  for (let i = 0; i < BARS; i++) {
+    v += (rnd() - 0.5) * 0.45;
+    v = Math.min(1, Math.max(0.15, v));
+    const env = Math.sin((Math.PI * (i + 1)) / (BARS + 1)) * 0.5 + 0.5;
+    heights.push(Math.max(0.12, v * env));
+  }
+  const layer = (cls) => {
+    const d = document.createElement("div");
+    d.className = `bars ${cls}`;
+    for (const h of heights) {
+      const b = document.createElement("i");
+      b.style.height = `${Math.round(h * 100)}%`;
+      d.appendChild(b);
+    }
+    return d;
+  };
+  el.replaceChildren(layer("base"), layer("fill"));
 }
 
 /* ---------- form ---------- */
@@ -78,6 +120,9 @@ function syncInstrumental() {
   document.querySelectorAll(".vocal-only").forEach((el) => (el.hidden = inst));
 }
 
+const selectedModel = () => document.querySelector('input[name="model"]:checked')?.value || "V6";
+const syncModel = () => ($("modelHint").textContent = MODEL_HINT[selectedModel()]);
+
 function bindRange(id, outId, fmt) {
   const update = () => ($(outId).textContent = fmt(Number($(id).value)));
   $(id).addEventListener("input", update);
@@ -86,7 +131,7 @@ function bindRange(id, outId, fmt) {
 
 function readForm() {
   const instrumental = $("instrumental").checked;
-  const base = { customMode: mode === "custom", instrumental, model: $("model").value, style: $("style").value };
+  const base = { customMode: mode === "custom", instrumental, model: selectedModel(), style: $("style").value };
   if (mode === "simple") return { ...base, prompt: $("prompt").value };
   const payload = {
     ...base,
@@ -106,8 +151,8 @@ function readForm() {
 }
 
 function describe(payload) {
-  if (payload.customMode) return payload.title || payload.style || "Custom song";
-  return payload.prompt || payload.style || "New song";
+  if (payload.customMode) return payload.title || payload.style || "Custom take";
+  return payload.prompt || payload.style || "New take";
 }
 
 function showError(msg) {
@@ -130,7 +175,7 @@ async function onSubmit(e) {
 
   const btn = $("submit");
   btn.disabled = true;
-  btn.querySelector(".btn-label").textContent = "Starting…";
+  btn.querySelector(".btn-label").textContent = "ARMING…";
 
   try {
     const { taskId } = await api("generate", {
@@ -141,6 +186,7 @@ async function onSubmit(e) {
     const job = {
       taskId,
       label: describe(payload).slice(0, 140),
+      model: payload.model,
       status: "PENDING",
       tracks: [],
       createdAt: Date.now(),
@@ -153,7 +199,7 @@ async function onSubmit(e) {
     showError(err.message);
   } finally {
     btn.disabled = false;
-    btn.querySelector(".btn-label").textContent = "Generate";
+    btn.querySelector(".btn-label").textContent = "GENERATE";
   }
 }
 
@@ -180,32 +226,36 @@ async function poll(job) {
     render();
     if (data.done) refreshCredits();
   } catch (err) {
-    // transient error: keep polling
-    console.warn("poll failed", err);
+    console.warn("poll failed", err); // transient: keep polling
   }
   if (isActive(job)) timers.set(job.taskId, setTimeout(() => poll(job), POLL_MS));
 }
 
 /* ---------- rendering ---------- */
 function fmtTime(s) {
-  if (!s && s !== 0) return "";
+  if (!Number.isFinite(s)) return "0:00";
   s = Math.round(s);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
 function render() {
   const root = $("tracks");
-  root.querySelectorAll(".job").forEach((n) => n.remove());
+  root.querySelectorAll(".take").forEach((n) => n.remove());
   $("empty").hidden = jobs.length > 0;
   $("clear").hidden = jobs.length === 0;
+  $("takeCount").textContent = String(jobs.length).padStart(2, "0");
+  $("rec").classList.toggle("on", jobs.some(isActive));
 
-  for (const job of jobs) {
+  jobs.forEach((job, i) => {
     const node = $("jobTpl").content.firstElementChild.cloneNode(true);
+    const failed = !!job.failed || job.status === "TIMEOUT";
     node.classList.toggle("done", job.status === "SUCCESS");
-    node.classList.toggle("failed", !!job.failed || job.status === "TIMEOUT");
-    node.querySelector(".job-title").textContent = job.label;
-    node.querySelector(".status-text").textContent =
-      (job.failed && job.error) || STATUS_TEXT[job.status] || job.status;
+    node.classList.toggle("failed", failed);
+    node.querySelector(".take-no").textContent = `TAKE ${String(jobs.length - i).padStart(2, "0")}`;
+    node.querySelector(".take-title").textContent = job.label;
+    node.querySelector(".take-title").title = job.label;
+    node.querySelector(".take-status").textContent =
+      (failed && job.error) || STATUS_TEXT[job.status] || job.status;
     node.querySelector(".remove").addEventListener("click", () => {
       clearTimeout(timers.get(job.taskId));
       jobs = jobs.filter((j) => j !== job);
@@ -213,21 +263,26 @@ function render() {
       render();
     });
 
-    const list = node.querySelector(".job-tracks");
+    const list = node.querySelector(".take-tracks");
     const tracks = job.tracks.length ? job.tracks : isActive(job) ? [{}, {}] : [];
-    for (const t of tracks) list.appendChild(renderTrack(t, job));
+    tracks.forEach((t, n) => list.appendChild(renderTrack(t, n, job)));
     root.appendChild(node);
-  }
+  });
+  syncPlaying();
 }
 
-function renderTrack(t, job) {
+function renderTrack(t, n, job) {
   const node = $("trackTpl").content.firstElementChild.cloneNode(true);
   const src = t.audio || t.stream;
-  const img = node.querySelector("img");
-  if (t.image) img.src = t.image;
-  node.querySelector(".track-title").textContent = t.title || (src ? "Untitled" : "Generating…");
-  node.querySelector(".track-tags").textContent = t.tags || "";
-  node.querySelector(".track-duration").textContent = fmtTime(t.duration);
+  node.dataset.id = t.id || "";
+  if (t.image) node.querySelector("img").src = t.image;
+  node.querySelector(".strip-ch").textContent = `CH${n + 1}`;
+  node.querySelector(".strip-title").textContent = t.title || (src ? "Untitled" : "Rendering…");
+  node.querySelector(".strip-dur").textContent = t.duration ? fmtTime(t.duration) : "--:--";
+  node.querySelector(".strip-tags").textContent = t.tags || (src ? "" : job.label);
+
+  const wave = node.querySelector(".wave");
+  buildWave(wave, t.id || `${job.taskId}-${n}`);
 
   const dl = node.querySelector(".download");
   if (t.audio) {
@@ -235,12 +290,12 @@ function renderTrack(t, job) {
     dl.setAttribute("download", `${(t.title || "track").replace(/[^\w\- ]+/g, "")}.mp3`);
   } else {
     dl.setAttribute("aria-disabled", "true");
-    dl.textContent = src ? "Finalizing…" : "Download";
+    if (src) dl.textContent = "FINALIZING";
   }
 
   const lyricsBtn = node.querySelector(".lyrics-btn");
-  const lyricsEl = node.querySelector(".track-lyrics");
-  if (t.lyrics && !/^\s*$/.test(t.lyrics)) {
+  const lyricsEl = node.querySelector(".strip-lyrics");
+  if (t.lyrics && t.lyrics.trim()) {
     lyricsEl.textContent = t.lyrics;
     lyricsBtn.addEventListener("click", () => (lyricsEl.hidden = !lyricsEl.hidden));
   } else {
@@ -249,30 +304,86 @@ function renderTrack(t, job) {
 
   if (!src) {
     node.classList.add("loading");
+    node.querySelector(".strip-icon").textContent = "◌";
   } else {
-    if ($("audio").dataset.id === t.id) node.classList.add("playing");
-    node.querySelector(".art").addEventListener("click", () => play(t));
+    node.querySelector(".strip-art").addEventListener("click", () => toggle(t));
+    wave.addEventListener("click", (e) => {
+      const ratio = (e.clientX - wave.getBoundingClientRect().left) / wave.clientWidth;
+      if (current?.id !== t.id) loadTrack(t);
+      seekTo(ratio);
+      audio.play().catch(() => {});
+    });
   }
   return node;
 }
 
-function play(t) {
-  const audio = $("audio");
-  const src = t.audio || t.stream;
-  if (audio.dataset.id === t.id && !audio.paused) return audio.pause();
-  if (audio.dataset.id !== t.id) {
-    audio.src = src;
-    audio.dataset.id = t.id;
-  }
+/* ---------- transport ---------- */
+function loadTrack(t) {
+  current = t;
+  audio.src = t.audio || t.stream;
   $("player").hidden = false;
   if (t.image) $("playerArt").src = t.image;
   else $("playerArt").removeAttribute("src");
   $("playerTitle").textContent = t.title || "Untitled";
   $("playerTags").textContent = t.tags || "";
-  audio.play().catch(() => {});
-  document.querySelectorAll(".track.playing").forEach((n) => n.classList.remove("playing"));
-  render();
+  buildWave($("tWave"), t.id);
+  syncPlaying();
 }
+
+function toggle(t) {
+  if (current?.id !== t.id) {
+    loadTrack(t);
+    return audio.play().catch(() => {});
+  }
+  audio.paused ? audio.play().catch(() => {}) : audio.pause();
+}
+
+function seekTo(ratio) {
+  const go = () => {
+    if (Number.isFinite(audio.duration)) audio.currentTime = Math.min(0.999, Math.max(0, ratio)) * audio.duration;
+  };
+  audio.readyState >= 1 ? go() : audio.addEventListener("loadedmetadata", go, { once: true });
+}
+
+function syncPlaying() {
+  const playing = !!current && !audio.paused;
+  document.querySelectorAll(".strip").forEach((s) => {
+    const mine = !!current && s.dataset.id === current.id;
+    s.classList.toggle("playing", mine);
+    const icon = s.querySelector(".strip-icon");
+    if (!s.classList.contains("loading")) icon.textContent = mine && playing ? "❚❚" : "▶";
+  });
+  $("tPlay").textContent = playing ? "❚❚" : "▶";
+  $("vu").classList.toggle("live", playing);
+  syncProgress();
+}
+
+function syncProgress() {
+  const p = audio.duration ? `${(audio.currentTime / audio.duration) * 100}%` : "0%";
+  $("tWave").style.setProperty("--p", p);
+  $("tCur").textContent = fmtTime(audio.currentTime);
+  $("tDur").textContent = fmtTime(audio.duration || current?.duration);
+  document.querySelectorAll(".strip .wave").forEach((w) => {
+    w.style.setProperty("--p", current && w.closest(".strip").dataset.id === current.id ? p : "0%");
+  });
+}
+
+audio.addEventListener("timeupdate", syncProgress);
+audio.addEventListener("loadedmetadata", syncProgress);
+audio.addEventListener("play", syncPlaying);
+audio.addEventListener("pause", syncPlaying);
+audio.addEventListener("ended", syncPlaying);
+$("tPlay").addEventListener("click", () => current && toggle(current));
+$("tScrub").addEventListener("click", (e) => {
+  const w = $("tScrub");
+  seekTo((e.clientX - w.getBoundingClientRect().left) / w.clientWidth);
+});
+$("tVol").addEventListener("input", (e) => (audio.volume = Number(e.target.value)));
+document.addEventListener("keydown", (e) => {
+  if (e.code !== "Space" || !current || e.target.closest("input, textarea, select, button")) return;
+  e.preventDefault();
+  toggle(current);
+});
 
 /* ---------- init ---------- */
 function chips(containerId, items, onPick) {
@@ -281,7 +392,7 @@ function chips(containerId, items, onPick) {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "chip";
-    b.textContent = text.length > 36 ? text.slice(0, 34) + "…" : text;
+    b.textContent = text;
     b.title = text;
     b.addEventListener("click", () => onPick(text));
     el.appendChild(b);
@@ -289,10 +400,11 @@ function chips(containerId, items, onPick) {
 }
 
 document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => setMode(t.dataset.mode)));
+document.querySelectorAll('input[name="model"]').forEach((r) => r.addEventListener("change", syncModel));
 $("instrumental").addEventListener("change", syncInstrumental);
 $("form").addEventListener("submit", onSubmit);
 $("clear").addEventListener("click", () => {
-  if (!confirm("Remove all tracks from your history?")) return;
+  if (!confirm("Remove all takes from your history?")) return;
   timers.forEach(clearTimeout);
   jobs = [];
   save();
@@ -306,12 +418,13 @@ chips("styles", STYLES, (s) => {
   $("style").value = cur.join(", ");
 });
 
-bindRange("duration", "durationOut", (v) => (v < 10 ? "auto" : fmtTime(v)));
-bindRange("styleWeight", "styleWeightOut", (v) => (v < 0 ? "default" : v.toFixed(2)));
-bindRange("weirdness", "weirdnessOut", (v) => (v < 0 ? "default" : v.toFixed(2)));
+bindRange("duration", "durationOut", (v) => (v < 10 ? "AUTO" : fmtTime(v)));
+bindRange("styleWeight", "styleWeightOut", (v) => (v < 0 ? "DEF" : v.toFixed(2)));
+bindRange("weirdness", "weirdnessOut", (v) => (v < 0 ? "DEF" : v.toFixed(2)));
 
 setMode("simple");
 syncInstrumental();
+syncModel();
 render();
 jobs.filter(isActive).forEach(poll);
 refreshCredits();
