@@ -1,0 +1,13 @@
+{
+  "name": "music-generator",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AI music generator powered by the Suno API, deployed on Netlify",
+  "scripts": {
+    "dev": "netlify dev"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
